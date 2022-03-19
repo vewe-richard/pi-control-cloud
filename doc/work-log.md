@@ -21,3 +21,7 @@ Next, setup reverssh refer to 1
 DAY02
 1. reverse ssh test on pi ------- ok
 2. setup git repo
+3. setup http script
+
+
+
