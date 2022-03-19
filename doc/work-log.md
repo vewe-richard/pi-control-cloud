@@ -22,6 +22,6 @@ DAY02
 1. reverse ssh test on pi ------- ok
 2. setup git repo
 3. setup http script
-
+4. script framework --- logger, cmd line parameters, config file
 
 
