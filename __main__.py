@@ -1,60 +1,27 @@
 # !/usr/bin/python3
-# Description: run in pi, connect web server, and get controlled through ssh reverse
+# Description: run in raspberry pi, connect web server, then get controlled through ssh reverse
 # Run this script:
-#   python3 __main__.py --config="./config.json" --loglevel=10
+#   PYTHONPATH=${PWD} python3 __main__.py setup --config="./config.json" --loglevel=10
 #
-import http
 import sys
 import os
-import urllib
-import http.client, urllib.parse
 from getopt import getopt
 import logging
 import subprocess
-import xml.etree.ElementTree as ET
-
-
-
-
-
-def http_post(ip, port, url, opts):
-    params = urllib.parse.urlencode(opts)
-    headers = {"Content-type": "application/x-www-form-urlencoded",
-               "Accept": "text/xml"}
-    conn = http.client.HTTPConnection(ip, port=port)
-    conn.request("POST", url, params, headers)
-    response = conn.getresponse()
-    return response
-
-def parse_response(resp):
-    logger.info("http post response: " + resp)
-    root = ET.fromstring(resp)
-    content = dict()
-    for x in root:
-        if x.tag == "head":
-            content["version"] = x.attrib["version"]
-            content["sn"] = x.attrib["sn"]
-            content["actionid"] = x.attrib["actionid"]
-            content["atype"] = x.attrib["actiontype"]
-        elif x.tag == "subprocess":
-            params = dict()
-            for y in x:
-                if y.tag == "args":
-                    params[y.tag] = json.loads(y.text)
-                else:
-                    params[y.tag] = y.text
-            content["subprocess"] = params
-    return content
+from core.utils import Config
+from core.apis import Apis
 
 def usage():
     print("")
-    print("python3 __main__.py [-h|--help] [--log=logfile] [--loglevel=loglevel] [--config=config]")
+    print("python3 __main__.py cmd [-h|--help] [--log=logfile] [--loglevel=loglevel] [--config=config]")
     print("")
-    print("\tlogfile: default is stdout if not specified. Run as service, normally logfile is /var/log/webapp2pi/log")
+    print("\tcmd:\t\tsetup | update | delete")
     print("")
-    print("\tloglevel: default is 30, [CRITICAL:50 ERROR:40 WARNING:30 INFO:20 DEBUG:10]")
+    print("\tlogfile:\tDefault is stdout if not specified. \n\t\t\tIf running as a service, logfile is /var/log/webapp2pi/log")
     print("")
-    print("\tconfig: configfile, default is /etc/webapp2pi/config.json if not specified")
+    print("\tloglevel:\tDefault is 20, [CRITICAL:50 ERROR:40 WARNING:30 INFO:20 DEBUG:10]")
+    print("")
+    print("\tconfig:\t\tDefault is /etc/webapp2pi/config.json")
     print("")
 
 def logsetup(logfile, loglevel):
@@ -73,12 +40,19 @@ def logsetup(logfile, loglevel):
     return logger
 
 if __name__ == "__main__":
+    cmd = sys.argv[1]
+
+    if cmd not in ["setup", "update", "delete"]:
+        print("\nUnknow command")
+        usage()
+        sys.exit(-1)
+
     #input parameters
-    opts, args = getopt(sys.argv[1:], "-h", ["log=", "loglevel=", "config=", "help"])
+    opts, args = getopt(sys.argv[2:], "-h", ["log=", "loglevel=", "config=", "help"])
 
     logfile = None #default is stdout
     configfile = "/etc/webapp2pi/config.json"
-    loglevel = logging.WARNING
+    loglevel = logging.INFO
 
     for o, v in opts:
         if o in "-h" or o in "--help":
@@ -91,44 +65,42 @@ if __name__ == "__main__":
         elif o in "--config":
             configfile = v
 
-    #check parameters
-
     #logfile
     print("Setup logger ...logfile", logfile, "loglevel:", loglevel)
     logger = logsetup(logfile, loglevel)
 
     #configfile
-    print("Load config from ", configfile)
+    logger.info("Load config from " + configfile)
     config = Config.getInstance()
     config.loadconfig(configfile)
     # Any more pre-run environment checking can be add here
 
-    try:
-        nodename = config.nodename()
-    except:
-        logger.error("Please specify nodename in config file")
-        sys.exit(-1)
+    apis = Apis(config, logger)
 
-    try:
-        # check if name is unique on WebApp
-        response = http_post(config.server(), config.port(), "/north/", {"CMD": "poll", "SN": nodename})
-        content = parse_response(response.read().decode())
-        logger.info(str(content))
-        # check result and avaliable port
-        if content["sn"] != nodename:  #Name is used
-            raise Exception("nodename is occupied")
-        port = content["actionid"]
-    except ConnectionRefusedError as e:
-        logger.warning(e)
-        sys.exit(-1)
-    except Exception as e:
-        logger.warning(e)
-        sys.exit(-1)
+    if cmd == "setup":
+        result = apis.CheckNodeName()
+        if result[0]:
+            logger.info("Node Name " + config.nodeName() + " is usable")
+        else:
+            logger.info("NOde Name " + config.nodeName() + " can not be use, " + result[1])
+            sys.exit(-1)
 
-
-
-    logger.info("port: " + port)
-
+        authKey = 'ssh-rsa ... todo'  #TODO
+        result = apis.AddNewDevice(authKey)
+        if result[0]:
+            logger.info("Add Device " + config.nodeName() + " Done")
+        else:
+            logger.info("Add Device " + config.nodeName() + " failed, " + result[1])
+            sys.exit(-1)
+        pass
+    elif cmd == "update":
+        pass
+    elif cmd == "delete":
+        result = apis.DeleteDevice()
+        if result[0]:
+            logger.info("Delete " + config.nodeName())
+        else:
+            logger.info("Fail to delete " + config.nodeName(), result[1])
     #
     logger.info("End of script")
 

@@ -23,17 +23,23 @@ class Config:
             self._config = json.load(json_file)
 
         try:
-            self._config["nodeName"]
+            self._config["NodeName"]
         except Exception as e:
             raise Exception("node name is not set in " + configfile)
 
         try:
-            self._config["tennantId"]
+            self._config["TennantId"]
         except Exception as e:
             raise Exception("tennant id is not set in " + configfile)
 
         try:
-            self._config["tennantApiKey"]
+            self._config["TennantApiKey"]
+        except Exception as e:
+            raise Exception("tennant api key is not set in " + configfile)
+
+        try:
+            self._config["WebServer"]
+            self._config["ServerPort"]
         except Exception as e:
             raise Exception("tennant api key is not set in " + configfile)
 
@@ -43,13 +49,22 @@ class Config:
         return self._configfile;
 
     def nodeName(self):
-        return self._config["nodename"]
+        return self._config["NodeName"]
 
     def tennantId(self):
-        return self._config["tennantId"]
+        return self._config["TennantId"]
 
     def tennantApiKey(self):
-        return self._config["tennantApiKey"]
+        return self._config["TennantApiKey"]
+
+    def webServer(self):
+        return self._config["WebServer"]
+
+    def serverPort(self):
+        return self._config["ServerPort"]
+
+    def debug(self):
+        return False
 
 
 
@@ -57,3 +72,4 @@ if __name__ == "__main__":
     config = Config.getInstance()
     print("Current working directory: ", os.getcwd())
     config.loadconfig("../config.json")
+    print(config.getInstance().serverPort())

@@ -1,8 +1,10 @@
 {
-  "nodeName": "pi4322",
-  "tennantId": "00090002",
-  "tennantApiKey": "sdsfsdoofioskdkjfjkkjskjkjd",
-  "bluetoothName": "apple32"
+  "NodeName": "pi4322",
+  "TennantId": "00090002",
+  "TennantApiKey": "sdsfsdoofioskdkjfjkkjskjkjd",
+  "BluetoothName": "apple32",
+  "WebServer": "192.168.100.168",
+  "ServerPort": 8080
 }
 
 
