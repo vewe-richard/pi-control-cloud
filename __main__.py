@@ -4,7 +4,6 @@
 #   python3 __main__.py --config="./config.json" --loglevel=10
 #
 import http
-import json
 import sys
 import os
 import urllib
@@ -12,44 +11,10 @@ import http.client, urllib.parse
 from getopt import getopt
 import logging
 import subprocess
+import xml.etree.ElementTree as ET
 
 
-class Config:
-    __instance = None
 
-    @staticmethod
-    def getInstance():
-        if Config.__instance == None:
-            Config()
-        return Config.__instance
-
-    def __init__(self):
-        if Config.__instance != None:
-            raise Exception("This class is a singleton!")
-        else:
-            Config.__instance = self
-
-    def loadconfig(self, configfile):
-        self._configfile = configfile
-        with open(configfile) as json_file:
-            self._config = json.load(json_file)
-
-        try:
-            self._config["nodename"]
-        except Exception as e:
-            raise Exception("Wrong edge config file: " + configfile)
-
-    def nodename(self):
-        return self._config["nodename"]
-
-    def server(self):
-        return self._config["server"]
-
-    def port(self):
-        return self._config["port"]
-
-    def configfile(self):
-        return self._configfile;
 
 
 def http_post(ip, port, url, opts):
@@ -60,6 +25,26 @@ def http_post(ip, port, url, opts):
     conn.request("POST", url, params, headers)
     response = conn.getresponse()
     return response
+
+def parse_response(resp):
+    logger.info("http post response: " + resp)
+    root = ET.fromstring(resp)
+    content = dict()
+    for x in root:
+        if x.tag == "head":
+            content["version"] = x.attrib["version"]
+            content["sn"] = x.attrib["sn"]
+            content["actionid"] = x.attrib["actionid"]
+            content["atype"] = x.attrib["actiontype"]
+        elif x.tag == "subprocess":
+            params = dict()
+            for y in x:
+                if y.tag == "args":
+                    params[y.tag] = json.loads(y.text)
+                else:
+                    params[y.tag] = y.text
+            content["subprocess"] = params
+    return content
 
 def usage():
     print("")
@@ -125,14 +110,24 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     try:
+        # check if name is unique on WebApp
         response = http_post(config.server(), config.port(), "/north/", {"CMD": "poll", "SN": nodename})
-        logger.info(response.read().decode())
+        content = parse_response(response.read().decode())
+        logger.info(str(content))
+        # check result and avaliable port
+        if content["sn"] != nodename:  #Name is used
+            raise Exception("nodename is occupied")
+        port = content["actionid"]
     except ConnectionRefusedError as e:
         logger.warning(e)
         sys.exit(-1)
     except Exception as e:
         logger.warning(e)
         sys.exit(-1)
+
+
+
+    logger.info("port: " + port)
 
     #
     logger.info("End of script")
